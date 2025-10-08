@@ -19,8 +19,8 @@ async function main() {
       type: "storybook",
     },
     {
-      title: "The Man with the Coconuts",
-      slug: "coconut-man",
+      title: "Alamat ni Bernardo Carpio",
+      slug: "bernardo-carpio",
       description: "A humorous Philippine folktale about greed and wisdom.",
       type: "storybook",
     },

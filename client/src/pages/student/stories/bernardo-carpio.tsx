@@ -53,23 +53,16 @@ const i18n = {
 // eager loading so both language JSON files are guaranteed to be bundled.
 // Use relative path (no alias) so Vite certainly matches during build.
 // __dirname equivalent isn't available; path is relative to this file.
-const bernardoPageModules: Record<string, any> = import.meta.glob(
-  '../../content/stories/bernardo-carpio.*.json',
-  { eager: true, import: 'default' }
-);
-function loadPages(lang: Lang): Promise<Page[]> {
+// Use the same dynamic import pattern used by other stories (sun-moon / necklace-comb).
+// Vite will statically analyze the template string and include matching JSON files.
+async function loadPages(lang: Lang): Promise<Page[]> {
   try {
-    // Find key ending with .<lang>.json
-    const key = Object.keys(bernardoPageModules).find(k => k.endsWith(`.${lang}.json`));
-    const rawArr = (key ? bernardoPageModules[key] : []) as any[];
-    const pages = (rawArr || []).map(r => normalizeRawPage(r));
-    if(!pages.length){
-      console.warn('[bernardo-carpio] JSON glob matched zero pages for lang', lang, 'keys:', Object.keys(bernardoPageModules));
-    }
-    return Promise.resolve(pages);
+    const mod = await import(`@/content/stories/bernardo-carpio.${lang}.json`);
+    const arr = (mod.default || []) as any[];
+    return arr.map(r => normalizeRawPage(r));
   } catch (e) {
-    console.warn('[bernardo-carpio] Failed to load JSON pages – using fallback.', e);
-    return Promise.resolve([]);
+    console.warn('[bernardo-carpio] Failed to import JSON pages – using fallback.', e);
+    return [];
   }
 }
 

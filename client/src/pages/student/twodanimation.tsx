@@ -9,20 +9,19 @@ import { Home, ArrowRight, Sparkles } from "lucide-react";
 import { getCheckpoint } from "@/lib/stories/checkpointClient";
 
 /* ------------------------------ Covers ------------------------------ */
-// (Served from /public)
-const sunMoonCover = "/book image/sun and moon.png";
-const necklaceCombCover = "/book image/necklace and the comb.png";
-const BernardoCarpioCover = "/book image/bernardo capio.jpg";
+const sunMoonCover = "/book-image/sun-and-moon.png";
+const necklaceCombCover = "/book-image/necklace-and-the-comb.png";
+const BernardoCarpioCover = "/book-image/bernardo-carpio.jpg";
 
 /* ------------------------------ Types ------------------------------- */
 type StoryItem = {
-  id: string;            // slug/route id
-  bookId?: number;       // optional numeric id
+  id: string;
+  bookId?: number;
   title: string;
   description: string;
   coverImage: string;
-  color: string;         // tailwind gradient colors (e.g., from-amber-500 to-yellow-400)
-  shadowColor: string;   // tailwind shadow color (e.g., shadow-amber-300/30)
+  color: string;
+  shadowColor: string;
   icon: string;
   pages: number;
 };
@@ -50,7 +49,6 @@ function StoryCard({
       ? Math.max(0, Math.min(100, Math.round(cp.percentComplete)))
       : null;
 
-  // CTA label
   let ctaLabel = "Read Story";
   if (typeof percent === "number") {
     if (percent >= 100) ctaLabel = "Read again";
@@ -72,26 +70,38 @@ function StoryCard({
         <div className="relative">
           {/* -------------------------- Cover -------------------------- */}
           <div className="relative aspect-[4/3] overflow-hidden rounded-b-none">
-            {/* Subtle frame/glow behind the image */}
-            <div
-              className={`absolute inset-0 bg-gradient-to-br ${story.color} opacity-25 pointer-events-none`}
+            {/* Background blur (fills gaps, never stretched) */}
+            <img
+              src={story.coverImage}
+              alt=""
               aria-hidden
+              className="absolute inset-0 w-full h-full object-cover blur-xl scale-110"
             />
-            {/* Keep FULL IMAGE visible */}
+            {/* Main cover (keeps full image ratio, fills container) */}
             <img
               src={story.coverImage}
               alt={story.title}
-              className="relative z-[1] w-full h-full object-contain object-center transition-transform duration-700 ease-in-out hover:scale-[1.04] bg-transparent"
+              className="relative z-[1] w-full h-full object-cover object-center transition-transform duration-700 ease-in-out hover:scale-[1.05]"
+              onError={(e) => {
+                const img = e.currentTarget as HTMLImageElement;
+                if ((img.dataset as any).fallbackTried) return;
+                (img.dataset as any).fallbackTried = "1";
+                if (img.src.includes("%20")) {
+                  img.src = img.src.replace(/%20/g, " ");
+                } else {
+                  img.src = img.src.replace(/ /g, "%20");
+                }
+              }}
             />
-            {/* Bottom fade for readability, much lower intensity */}
-            <div
-              className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/35 to-transparent z-[2] pointer-events-none"
-              aria-hidden
-            />
+
+            {/* Bottom fade */}
+            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/35 to-transparent z-[2] pointer-events-none" />
+
             {/* Icon */}
             <div className="absolute top-4 right-4 z-[3] w-10 h-10 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full text-xl shadow-md">
               {story.icon}
             </div>
+
             {/* Progress chip */}
             {typeof percent === "number" && percent > 0 && (
               <div className="absolute bottom-4 left-4 z-[3] text-xs px-3 py-1 rounded-md bg-black/45 backdrop-blur-sm text-white border border-white/20 shadow-sm">
