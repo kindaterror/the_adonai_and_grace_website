@@ -40,6 +40,7 @@ const clUrl = (publicId?: string, w = 800, h = 450) => {
 
 // == TYPE DEFINITIONS ==
 export interface Question {
+  id?: string;
   questionText: string;
   answerType: string;
   correctAnswer?: string;
@@ -150,6 +151,9 @@ export function PageForm({
     },
   });
 
+  // Track the last saved state to avoid unnecessary saves
+  const lastSavedStateRef = useRef<string>('');
+
   // Debounced save function
   const debouncedSave = useCallback(() => {
     if (saveTimeoutRef.current) {
@@ -169,7 +173,20 @@ export function PageForm({
           questions: questions.length > 0 ? questions : undefined,
           showNotification: false // Don't show notification for auto-saves
         };
-        onSave(payload);
+        
+        // Create a hash of the current state to compare with last saved state
+        const currentStateHash = JSON.stringify({
+          title: payload.title,
+          content: payload.content,
+          imageUrl: payload.imageUrl,
+          questions: payload.questions
+        });
+        
+        // Only save if something has actually changed
+        if (currentStateHash !== lastSavedStateRef.current) {
+          lastSavedStateRef.current = currentStateHash;
+          onSave(payload);
+        }
       }
     }, 1000); // Save after 1 second of no changes
   }, [form, initialValues?.id, pageNumber, questions, onSave]);
@@ -187,7 +204,11 @@ export function PageForm({
   const prevInitIdRef = useRef<number | undefined>(initialValues?.id);
   useEffect(() => {
     if (initialValues?.id !== prevInitIdRef.current) {
-      setQuestions(initialValues?.questions || []);
+      const questionsWithIds = (initialValues?.questions || []).map(q => ({
+        ...q,
+        id: q.id || `question-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      }));
+      setQuestions(questionsWithIds);
       prevInitIdRef.current = initialValues?.id;
     }
   }, [initialValues?.id, initialValues?.questions]);
@@ -275,7 +296,13 @@ export function PageForm({
   const addQuestion = () => {
     setQuestions(prev => [
       ...prev,
-      { questionText: '', answerType: 'text', correctAnswer: '', options: '' }
+      { 
+        id: `question-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        questionText: '', 
+        answerType: 'text', 
+        correctAnswer: '', 
+        options: '' 
+      }
     ]);
     setLastQuestionsChange(Date.now());
     debouncedSave();
@@ -557,7 +584,7 @@ export function PageForm({
               <AnimatePresence initial={false}>
                 {questions.map((question, index) => (
                   <motion.div
-                    key={index}
+                    key={question.id || `question-${index}`}
                     variants={itemFade}
                     initial="hidden"
                     animate="visible"

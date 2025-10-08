@@ -1,5 +1,5 @@
 // == IMPORTS & DEPENDENCIES ==
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -395,12 +395,32 @@ export default function EditBook() {
     setPages([...pages, newPage]);
   };
 
-  const handlePageSave = (pageData: PageFormValues) => {
-    setPages(prev => prev.map(p => (p.pageNumber === pageData.pageNumber ? pageData : p)));
+  const handlePageSave = useCallback((pageData: PageFormValues) => {
+    setPages(prev => {
+      const updated = prev.map(p => {
+        if (p.pageNumber === pageData.pageNumber) {
+          // Only update if the data has actually changed to prevent unnecessary re-renders
+          const hasChanged = 
+            p.title !== pageData.title ||
+            p.content !== pageData.content ||
+            p.imageUrl !== pageData.imageUrl ||
+            p.imagePublicId !== pageData.imagePublicId ||
+            JSON.stringify(p.questions) !== JSON.stringify(pageData.questions);
+          
+          return hasChanged ? pageData : p;
+        }
+        return p;
+      });
+      
+      // Only update state if something actually changed
+      const stateChanged = updated.some((page, index) => page !== prev[index]);
+      return stateChanged ? updated : prev;
+    });
+    
     if (pageData.showNotification) {
       toast({ title: '✅ Page Saved', description: 'Page changes saved locally. Click "Save Changes" to update the book.' });
     }
-  };
+  }, [toast]);
 
   const handleRemovePage = (pageNumber: number) => {
     const pageToRemove = pages.find(p => p.pageNumber === pageNumber);
