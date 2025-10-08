@@ -1,5 +1,5 @@
-
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+// == IMPORTS & DEPENDENCIES ==
+import React, { useState, useRef, useEffect } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Trash2, Plus, Upload, X, Image, Sparkles, Loader2 } from 'lucide-react';
+import { Trash2, Plus, Upload, X, Image, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Form,
@@ -18,9 +18,9 @@ import {
   FormMessage,
   FormDescription
 } from '@/components/ui/form';
-import { motion, AnimatePresence } from '@/lib/motionShim';
+import { motion, AnimatePresence } from 'framer-motion';
 
-/** ================= Cloudinary helpers ================= */
+/** ================= Cloudinary helpers (Vite + Next-safe) ================= */
 const cloud =
   ((typeof import.meta !== 'undefined' ? (import.meta as any)?.env : undefined)
     ?.VITE_CLOUDINARY_CLOUD_NAME as string | undefined) ||
@@ -40,7 +40,6 @@ const clUrl = (publicId?: string, w = 800, h = 450) => {
 
 // == TYPE DEFINITIONS ==
 export interface Question {
-  id?: string;
   questionText: string;
   answerType: string;
   correctAnswer?: string;
@@ -49,10 +48,10 @@ export interface Question {
 
 const pageSchema = z.object({
   pageNumber: z.coerce.number().min(1, 'Page number is required'),
-  title: z.string().default(''),
+  title: z.string().optional(),
   content: z.string().min(1, 'Content is required'),
-  imageUrl: z.string().default(''),
-  imagePublicId: z.string().default(''),
+  imageUrl: z.string().optional(),
+  imagePublicId: z.string().optional(),
 });
 
 export interface PageFormValues extends z.infer<typeof pageSchema> {
@@ -69,7 +68,7 @@ interface PageFormProps {
   showRemoveButton?: boolean;
 }
 
-// == Motion presets ==
+// == Motion presets (UI-only) ==
 const fadeCard = {
   hidden: { opacity: 0, y: 8 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
@@ -85,166 +84,112 @@ const itemFade = {
 };
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.08 } } };
 
-// == helpers ==
-const getToken = () => {
-  if (typeof window === 'undefined') return null;
-  const t = localStorage.getItem('token');
-  return t && t !== 'null' ? t : null;
-};
-
-async function uploadPageImage(file: File) {
-  const fd = new FormData();
-  fd.append('file', file);
-  fd.append('kind', 'page_image');
-
-  const token = getToken();
-  const resp = await fetch(`/api/upload?folder=${encodeURIComponent('ilaw-ng-bayan/pages/images')}`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    body: fd,
-  });
-  const data = await resp.json();
-  if (!resp.ok || !data?.success) {
-    throw new Error(data?.error || 'Image upload failed');
-  }
-  return data as { success: true; url: string; publicId: string };
-}
-
-function PageFormComponent({
+// == PAGE FORM COMPONENT ==
+export function PageForm({
   initialValues,
   pageNumber,
   onSave,
   onRemove,
   showRemoveButton = true
 }: PageFormProps) {
+
+  // == State & Refs ==
   const { toast } = useToast();
-  
-  // DEBUG: Let's see what's causing re-renders
-  console.log('PageForm render - pageNumber:', pageNumber, 'initialValues:', initialValues);
-
-  // Stable internal id (can be used by parent as key: p.id ?? stableTempIdRef.current)
-  const stableTempIdRef = useRef(
-    initialValues?.id
-      ? `page-${initialValues.id}`
-      : `temp-${(typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2))}`
-  );
-
+  const [hasQuestions, setHasQuestions] = useState(false);
   const [questions, setQuestions] = useState<Question[]>(initialValues?.questions || []);
   const [imagePreview, setImagePreview] = useState<string | null>(initialValues?.imageUrl || null);
-  const [imageUploading, setImageUploading] = useState(false);
-  const [previewSrc, setPreviewSrc] = useState<string | null>(initialValues?.imageUrl || null);
-  const [previewTriedTransformed, setPreviewTriedTransformed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [lastQuestionsChange, setLastQuestionsChange] = useState(0);
   const [lastImageChange, setLastImageChange] = useState(0);
+  const saveTimeoutRef = useRef<number | null>(null);
 
-  // Debounced save timeout reference
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // == Effects ==
+  useEffect(() => {
+    if (initialValues?.questions && initialValues.questions.length > 0) {
+      setQuestions(initialValues.questions);
+      setHasQuestions(true);
+    }
+    setTimeout(() => setIsInitialLoad(false), 1000);
+  }, [initialValues?.questions]);
 
-  // Initialize form
+  // == Form Initialization ==
   const form = useForm<PageFormValues>({
     resolver: zodResolver(pageSchema),
-    defaultValues: {
-      pageNumber: initialValues?.pageNumber || pageNumber,
-      title: initialValues?.title || '',
-      content: initialValues?.content || '',
-      imageUrl: initialValues?.imageUrl || '',
-      imagePublicId: initialValues?.imagePublicId || '',
+    defaultValues: initialValues || {
+      pageNumber,
+      title: '',
+      content: '',
+      imageUrl: '',
+      imagePublicId: '',
     },
   });
 
-  // Track the last saved state to avoid unnecessary saves
-  const lastSavedStateRef = useRef<string>('');
-
-  // Debounced save function
-  const debouncedSave = useCallback(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    
-    saveTimeoutRef.current = setTimeout(() => {
-      const formValues = form.getValues();
-      if (formValues.content && formValues.content.trim()) {
-        const payload = {
-          id: initialValues?.id,
-          pageNumber,
-          title: formValues.title ?? '',
-          content: formValues.content ?? '',
-          imageUrl: formValues.imageUrl ?? '',
-          imagePublicId: formValues.imagePublicId ?? '',
-          questions: questions.length > 0 ? questions : undefined,
-          showNotification: false // Don't show notification for auto-saves
-        };
-        
-        // Create a hash of the current state to compare with last saved state
-        const currentStateHash = JSON.stringify({
-          title: payload.title,
-          content: payload.content,
-          imageUrl: payload.imageUrl,
-          questions: payload.questions
-        });
-        
-        // Only save if something has actually changed
-        if (currentStateHash !== lastSavedStateRef.current) {
-          lastSavedStateRef.current = currentStateHash;
-          onSave(payload);
-        }
-      }
-    }, 2000); // Increased to 2 seconds for less frequent saves
-  }, [form, initialValues?.id, pageNumber, questions, onSave]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Sync questions only on first mount or when initialValues.id changes (avoid resets)
-  const prevInitIdRef = useRef<number | undefined>(initialValues?.id);
-  useEffect(() => {
-    if (initialValues?.id !== prevInitIdRef.current) {
-      const questionsWithIds = (initialValues?.questions || []).map(q => ({
-        ...q,
-        id: q.id || `question-${Date.now()}-${Math.random().toString(36).slice(2)}`
-      }));
-      setQuestions(questionsWithIds);
-      prevInitIdRef.current = initialValues?.id;
-    }
-  }, [initialValues?.id, initialValues?.questions]);
-
-  // Cloudinary preview logic
+  // Prefer Cloudinary preview if a publicId is present
   const cloudPublicId = form.watch('imagePublicId');
-  const watchedImageUrl = form.watch('imageUrl');
-  const transformed = cloudPublicId ? clUrl(cloudPublicId) : '';
-  const fallbackRaw =
-    imagePreview ||
-    (watchedImageUrl && /^https?:\/\//i.test(watchedImageUrl) ? watchedImageUrl : '');
+  const computedPreview = cloudPublicId ? clUrl(cloudPublicId) : imagePreview;
 
+  // == Auto-Save: Content Changes ==
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (transformed && !previewTriedTransformed) {
-      setPreviewTriedTransformed(true);
-      const testImg: HTMLImageElement = document.createElement('img');
-      testImg.onload = () => setPreviewSrc(transformed);
-      testImg.onerror = () => setPreviewSrc(fallbackRaw || null);
-      testImg.src = transformed;
-    } else if (!transformed) {
-      setPreviewSrc(fallbackRaw || null);
-    } else if (!previewSrc) {
-      setPreviewSrc(fallbackRaw || null);
+    const subscription = form.watch((values, { type }) => {
+      if (isInitialLoad) return;
+
+      if (values.content && values.content.trim() && type === 'change') {
+        setHasUnsavedChanges(true);
+
+        const pageData: PageFormValues = {
+          ...values,
+          content: values.content ?? '',
+          pageNumber,
+          questions: questions.length > 0 ? questions : undefined,
+          showNotification: false,
+        };
+
+        // debounce via shared ref
+        if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = window.setTimeout(() => {
+          onSave(pageData);
+          setHasUnsavedChanges(false);
+          saveTimeoutRef.current = null;
+        }, 1200) as unknown as number;
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form, pageNumber, questions, onSave, isInitialLoad, hasUnsavedChanges]);
+
+  // == Auto-Save: Question Changes ==
+  useEffect(() => {
+    if (isInitialLoad) return;
+
+    const formValues = form.getValues();
+    if (formValues.content && formValues.content.trim()) {
+      setHasUnsavedChanges(true);
+
+      const now = Date.now();
+      const shouldShowNotification = now - lastQuestionsChange < 500;
+
+      const pageData: PageFormValues = {
+        ...formValues,
+        content: formValues.content ?? '',
+        pageNumber,
+        questions: questions.length > 0 ? questions : undefined,
+        showNotification: shouldShowNotification,
+      };
+
+      if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = window.setTimeout(() => {
+        onSave(pageData);
+        setHasUnsavedChanges(false);
+        saveTimeoutRef.current = null;
+      }, 500) as unknown as number;
     }
-  }, [transformed, fallbackRaw, previewSrc, previewTriedTransformed]);
-
-
-
-
+  }, [questions, form, pageNumber, onSave, isInitialLoad, hasUnsavedChanges, lastQuestionsChange]);
 
   // == Image Handling ==
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -257,35 +202,71 @@ function PageFormComponent({
       return;
     }
 
-    try {
-      setImageUploading(true);
-      const { url, publicId } = await uploadPageImage(file);
-      form.setValue('imageUrl', url, { shouldDirty: true });
-      form.setValue('imagePublicId', publicId ?? '', { shouldDirty: true });
-      setImagePreview(url);
-      setPreviewSrc(url);
-      setPreviewTriedTransformed(false);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = (e.target?.result as string) || '';
+      setImagePreview(dataUrl);
+      form.setValue("imageUrl", dataUrl);
+      setHasUnsavedChanges(true);
       setLastImageChange(Date.now());
-      toast({ title: 'Image uploaded', description: 'Page image uploaded successfully.' });
-    } catch (err: any) {
-      toast({
-        title: 'Upload failed',
-        description: err?.message || 'Could not upload image.',
-        variant: 'destructive'
-      });
-    } finally {
-      setImageUploading(false);
-    }
+
+      const formValues = form.getValues();
+      const pageData: PageFormValues = {
+        ...formValues,
+        content: formValues.content ?? '',
+        imageUrl: dataUrl,
+        pageNumber,
+        questions: questions.length > 0 ? questions : undefined,
+        showNotification: true,
+      };
+
+      if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = window.setTimeout(() => {
+        onSave(pageData);
+        setHasUnsavedChanges(false);
+        saveTimeoutRef.current = null;
+      }, 500) as unknown as number;
+    };
+    reader.readAsDataURL(file);
   };
 
   const clearImage = () => {
     setImagePreview(null);
-    setPreviewSrc(null);
     form.setValue("imageUrl", "");
-    form.setValue("imagePublicId", "");
+    setHasUnsavedChanges(true);
     setLastImageChange(Date.now());
-    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    const formValues = form.getValues();
+    const pageData: PageFormValues = {
+      ...formValues,
+      content: formValues.content ?? '',
+      imageUrl: "",
+      pageNumber,
+      questions: questions.length > 0 ? questions : undefined,
+      showNotification: true,
+    };
+
+    if (saveTimeoutRef.current) window.clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = window.setTimeout(() => {
+      onSave(pageData);
+      setHasUnsavedChanges(false);
+      saveTimeoutRef.current = null;
+    }, 500) as unknown as number;
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
+
+  // cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        window.clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // == Question Utilities ==
   const getOptionsList = (optionsString?: string): string[] => {
@@ -297,42 +278,37 @@ function PageFormComponent({
 
   // == Question Management ==
   const addQuestion = () => {
-    setQuestions(prev => [
-      ...prev,
-      { 
-        id: `question-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        questionText: '', 
-        answerType: 'text', 
-        correctAnswer: '', 
-        options: '' 
-      }
+    setQuestions([
+      ...questions,
+      { questionText: '', answerType: 'text', correctAnswer: '', options: '' }
     ]);
+    setHasQuestions(true);
+    setHasUnsavedChanges(true);
     setLastQuestionsChange(Date.now());
-    debouncedSave();
   };
 
   const removeQuestion = (index: number) => {
-    setQuestions(prev => {
-      const updated = [...prev];
-      updated.splice(index, 1);
-      return updated;
-    });
+    const updated = [...questions];
+    updated.splice(index, 1);
+    setQuestions(updated);
+    setHasUnsavedChanges(true);
     setLastQuestionsChange(Date.now());
-    debouncedSave();
+    if (updated.length === 0) setHasQuestions(false);
   };
 
   const updateQuestion = (index: number, field: keyof Question, value: string) => {
-    setQuestions(prev => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
-      if (field === 'answerType' && value === 'multiple_choice') {
-        const opts = getOptionsList(updated[index].options);
-        if (opts.length === 0) updated[index].options = "Option 1\nOption 2\nOption 3";
-      }
-      return updated;
-    });
+    const updated = [...questions];
+    updated[index] = { ...updated[index], [field]: value };
+
+    if (field === 'answerType' && value === 'multiple_choice') {
+      const current = updated[index];
+      const opts = getOptionsList(current.options);
+      if (opts.length === 0) current.options = "Option 1\nOption 2\nOption 3";
+    }
+
+    setQuestions(updated);
+    setHasUnsavedChanges(true);
     setLastQuestionsChange(Date.now());
-    debouncedSave();
   };
 
   // == Option Management ==
@@ -359,46 +335,58 @@ function PageFormComponent({
     updateQuestion(qi, 'options', opts.join('\n'));
   };
 
+  // == Render Component ==
   return (
     <motion.div
-      data-stable-id={stableTempIdRef.current}
       variants={fadeCard}
       initial="hidden"
       animate="visible"
       className="border-2 border-brand-gold-200 bg-white rounded-2xl shadow-lg mb-5"
     >
-      {/* Header */}
+      {/* == Page Header == */}
       <div className="border-b border-brand-gold-200 p-4">
         <div className="flex justify-between items-center">
           <h3 className="text-xl font-heading font-bold text-ilaw-navy flex items-center">
             <Sparkles className="h-5 w-5 text-ilaw-gold mr-2" />
             📄 Page {pageNumber}
-          </h3>
-          <div className="flex items-center gap-2">
-            {showRemoveButton && (
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={onRemove}
-                className="bg-red-500 hover:bg-red-600 text-white font-heading font-bold"
+            {hasUnsavedChanges && !isInitialLoad && (
+              <motion.span
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="ml-2 text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium"
               >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Remove Page
-              </Button>
+                • Unsaved
+              </motion.span>
             )}
-          </div>
+          </h3>
+          {showRemoveButton && (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={onRemove}
+              className="bg-red-500 hover:bg-red-600 text-white font-heading font-bold"
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Remove Page
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Content */}
+      {/* == Form Content == */}
       <div className="p-4">
         <Form {...form}>
           <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-5">
+
+            {/* Hidden field for Cloudinary ID */}
             <FormField control={form.control} name="imagePublicId" render={({ field }) => (<input type="hidden" {...field} />)} />
 
+            {/* === Top Grid: fields (2 cols) + image (1 col) === */}
             <motion.div variants={sectionFade} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+              {/* Left: fields */}
               <div className="md:col-span-2 flex flex-col gap-4 md:h-full">
+                {/* Title */}
                 <motion.div variants={itemFade}>
                   <FormField
                     control={form.control}
@@ -410,11 +398,7 @@ function PageFormComponent({
                           <Input
                             placeholder="Enter a title for this page"
                             {...field}
-                            value={field.value ?? ''}
-                            onChange={(e) => {
-                              field.onChange(e.target.value);
-                              debouncedSave();
-                            }}
+                            value={field.value || ''}
                             className="border-2 border-brand-gold-200 focus:border-ilaw-gold"
                           />
                         </FormControl>
@@ -424,6 +408,7 @@ function PageFormComponent({
                   />
                 </motion.div>
 
+                {/* Content */}
                 <motion.div variants={itemFade}>
                   <FormField
                     control={form.control}
@@ -435,11 +420,7 @@ function PageFormComponent({
                           <Textarea
                             placeholder="Enter the content for this page..."
                             {...field}
-                            onChange={(e) => {
-                              field.onChange(e.target.value);
-                              debouncedSave();
-                            }}
-                            className="border-2 border-brand-gold-200 focus:border-ilaw-gold flex-1 h-full min-h=[260px] md:min-h-0 resize-vertical md:resize-none"
+                            className="border-2 border-brand-gold-200 focus:border-ilaw-gold flex-1 h-full min-h-[260px] md:min-h-0 resize-vertical md:resize-none"
                           />
                         </FormControl>
                         <FormMessage />
@@ -449,7 +430,7 @@ function PageFormComponent({
                 </motion.div>
               </div>
 
-              {/* Image */}
+              {/* Right: image panel */}
               <motion.div variants={itemFade} className="md:col-span-1 space-y-3">
                 <FormField
                   control={form.control}
@@ -458,8 +439,9 @@ function PageFormComponent({
                     <FormItem>
                       <FormLabel className="text-ilaw-navy font-heading font-bold">🖼️ Page Image</FormLabel>
                       <div className="space-y-3">
+                        {/* Preview */}
                         <AnimatePresence initial={false} mode="popLayout">
-                          {previewSrc ? (
+                          {computedPreview ? (
                             <motion.div
                               key="img-preview"
                               initial={{ opacity: 0, scale: 0.98 }}
@@ -469,14 +451,9 @@ function PageFormComponent({
                             >
                               <div className="relative aspect-[3/4] bg-brand-gold-50 rounded-xl overflow-hidden border-2 border-brand-gold-200">
                                 <img
-                                  src={previewSrc}
+                                  src={computedPreview}
                                   alt="Page image preview"
                                   className="w-full h-full object-cover"
-                                  onError={() => {
-                                    if (previewSrc === transformed && fallbackRaw) {
-                                      setPreviewSrc(fallbackRaw);
-                                    }
-                                  }}
                                 />
                                 <Button
                                   type="button"
@@ -484,7 +461,6 @@ function PageFormComponent({
                                   size="icon"
                                   className="absolute top-2 right-2 h-8 w-8 rounded-full bg-red-500 hover:bg-red-600"
                                   onClick={clearImage}
-                                  disabled={imageUploading}
                                 >
                                   <X className="h-4 w-4" />
                                 </Button>
@@ -499,14 +475,12 @@ function PageFormComponent({
                               className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-brand-gold-300 rounded-xl bg-brand-gold-50"
                             >
                               <Image className="h-7 w-7 text-brand-gold-600 mb-2" />
-                              <p className="text-sm text-brand-gold-600 font-medium mb-2">
-                                Upload an image for this page
-                              </p>
+                              <p className="text-sm text-brand-gold-600 font-medium mb-2">Upload an image for this page</p>
                               <div className="flex items-center space-x-2">
                                 <input
                                   ref={fileInputRef}
                                   type="file"
-                                  accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                                  accept="image/*"
                                   className="hidden"
                                   onChange={handleImageUpload}
                                   id={`image-upload-${pageNumber}`}
@@ -517,25 +491,16 @@ function PageFormComponent({
                                   size="sm"
                                   className="border-2 border-brand-gold-300 text-ilaw-navy hover:bg-brand-gold-100 font-heading font-bold"
                                   onClick={() => fileInputRef.current?.click()}
-                                  disabled={imageUploading}
                                 >
-                                  {imageUploading ? (
-                                    <>
-                                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                      Uploading…
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Upload className="h-4 w-4 mr-1" />
-                                      Choose Image
-                                    </>
-                                  )}
+                                  <Upload className="h-4 w-4 mr-1" />
+                                  Choose Image
                                 </Button>
                               </div>
                             </motion.div>
                           )}
                         </AnimatePresence>
 
+                        {/* URL input */}
                         <div className="relative">
                           <FormControl>
                             <Input
@@ -544,18 +509,13 @@ function PageFormComponent({
                               value={field.value || ''}
                               className="border-2 border-brand-gold-200 focus:border-ilaw-gold"
                               onChange={(e) => {
-                                const v = e.target.value;
-                                field.onChange(v);
-                                if (v) form.setValue('imagePublicId', '');
-                                setImagePreview(v || null);
+                                field.onChange(e);
                                 setLastImageChange(Date.now());
-                                debouncedSave();
                               }}
-                              disabled={imageUploading}
                             />
                           </FormControl>
                           <FormDescription className="text-brand-gold-600 font-medium">
-                            You can upload OR paste a direct URL. Uploading uses Cloudinary.
+                            You can upload OR paste a URL
                           </FormDescription>
                           <FormMessage />
                         </div>
@@ -566,7 +526,7 @@ function PageFormComponent({
               </motion.div>
             </motion.div>
 
-            {/* Questions */}
+            {/* == Questions Section == */}
             <motion.div variants={sectionFade} className="pt-5 border-t-2 border-brand-gold-200">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-heading font-bold text-ilaw-navy flex items-center">
@@ -587,7 +547,7 @@ function PageFormComponent({
               <AnimatePresence initial={false}>
                 {questions.map((question, index) => (
                   <motion.div
-                    key={question.id || `question-${index}`}
+                    key={index}
                     variants={itemFade}
                     initial="hidden"
                     animate="visible"
@@ -661,10 +621,7 @@ function PageFormComponent({
                             <Label className="text-ilaw-navy font-heading font-bold">Options</Label>
                             <div className="border-2 border-brand-gold-200 rounded-xl mt-1 bg-white">
                               {getOptionsList(question.options).map((option, optionIdx) => (
-                                <div
-                                  key={optionIdx}
-                                  className="flex items-center p-3 border-b border-brand-gold-200 last:border-b-0"
-                                >
+                                <div key={optionIdx} className="flex items-center p-3 border-b border-brand-gold-200 last:border-b-0">
                                   <input
                                     type="radio"
                                     id={`question-${index}-option-${optionIdx}`}
@@ -728,11 +685,12 @@ function PageFormComponent({
               )}
             </motion.div>
 
+            {/* == Auto-Save Status == */}
             <motion.div variants={sectionFade} className="pt-5 border-t-2 border-brand-gold-200">
               <div className="bg-gradient-to-r from-brand-gold-50 to-brand-navy-50/40 border-2 border-brand-gold-200 rounded-xl p-3 text-center">
                 <p className="text-sm text-ilaw-navy font-medium flex items-center justify-center">
                   <Sparkles className="h-4 w-4 mr-2 text-ilaw-gold" />
-                  ✨ Your changes are automatically saved.
+                  ✨ Changes save automatically. Click "Save Changes" at the bottom to update the book.
                 </p>
               </div>
             </motion.div>
@@ -742,14 +700,3 @@ function PageFormComponent({
     </motion.div>
   );
 }
-
-// Memoize the component to prevent unnecessary re-renders
-export const PageForm = React.memo(PageFormComponent, (prevProps, nextProps) => {
-  // Custom comparison function - only re-render if these specific props change
-  return (
-    prevProps.pageNumber === nextProps.pageNumber &&
-    prevProps.showRemoveButton === nextProps.showRemoveButton &&
-    // Deep compare initialValues to avoid re-renders when reference changes but content is same
-    JSON.stringify(prevProps.initialValues) === JSON.stringify(nextProps.initialValues)
-  );
-});
