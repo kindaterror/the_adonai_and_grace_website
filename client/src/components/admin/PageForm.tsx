@@ -154,42 +154,12 @@ export function PageForm({
   // Track the last saved state to avoid unnecessary saves
   const lastSavedStateRef = useRef<string>('');
 
-  // Debounced save function
+  // Debounced save function - TEMPORARILY DISABLED FOR DEBUGGING
   const debouncedSave = useCallback(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    
-    saveTimeoutRef.current = setTimeout(() => {
-      const formValues = form.getValues();
-      if (formValues.content && formValues.content.trim()) {
-        const payload = {
-          id: initialValues?.id,
-          pageNumber,
-          title: formValues.title ?? '',
-          content: formValues.content ?? '',
-          imageUrl: formValues.imageUrl ?? '',
-          imagePublicId: formValues.imagePublicId ?? '',
-          questions: questions.length > 0 ? questions : undefined,
-          showNotification: false // Don't show notification for auto-saves
-        };
-        
-        // Create a hash of the current state to compare with last saved state
-        const currentStateHash = JSON.stringify({
-          title: payload.title,
-          content: payload.content,
-          imageUrl: payload.imageUrl,
-          questions: payload.questions
-        });
-        
-        // Only save if something has actually changed
-        if (currentStateHash !== lastSavedStateRef.current) {
-          lastSavedStateRef.current = currentStateHash;
-          onSave(payload);
-        }
-      }
-    }, 1000); // Save after 1 second of no changes
-  }, [form, initialValues?.id, pageNumber, questions, onSave]);
+    // DISABLED: Let's see if this stops the cursor jumping
+    console.log('debouncedSave called but disabled for debugging');
+    // Early return - no saving will happen
+  }, []);
 
   // Cleanup timeout on unmount
   useEffect(() => {
