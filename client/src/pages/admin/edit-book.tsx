@@ -312,7 +312,8 @@ export default function EditBook() {
     },
     onSuccess: () => {
       toast({ title: '✅ Page Updated', description: 'The page has been updated successfully.' });
-      queryClient.invalidateQueries({ queryKey: [`/api/books/${bookId}/pages`] });
+      // ❌ REMOVED: queryClient.invalidateQueries({ queryKey: [`/api/books/${bookId}/pages`] });
+      // This was causing cursor jumping by triggering re-renders during autosave
     },
     onError: (error: any) => {
       let errorMessage = error?.message || 'Failed to update page';
@@ -371,6 +372,10 @@ export default function EditBook() {
       await updateBookMutation.mutateAsync(data);
       for (const page of pages) await updatePagesMutation.mutateAsync(page);
       await saveBadgesMutation.mutateAsync();
+
+      // ✅ NOW invalidate queries after manual save (not during autosave)
+      queryClient.invalidateQueries({ queryKey: [`/api/books/${bookId}/pages`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/books'] });
 
       navigate('/admin/books');
     } catch {
