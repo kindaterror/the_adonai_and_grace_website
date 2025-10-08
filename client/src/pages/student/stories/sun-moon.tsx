@@ -33,7 +33,7 @@ const LoopingVideoLazy = lazy(() => import("@/components/LoopingVideo"));
 // NOTE: original heavy GIF imports were removed to reduce bundle size & network transfer.
 // The story now relies on videoMp4/videoWebm fields inside the dynamic JSON pages.
 // If you still need a lightweight poster for initial preload, add it as page.videoPoster in JSON.
-import bg from "@/assets/bookanimation/sun and moon.png";
+import bg from "@/assets/bookanimation/bg (1).mp4";
 import "@/pages/student/stories/2danimatedstorybook.css";
 import "./sun-moon.css";
 // checkpoint helpers

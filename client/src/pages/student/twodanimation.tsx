@@ -9,9 +9,9 @@ import { BookOpen, Home, ArrowRight, Sparkles } from "lucide-react";
 import { getCheckpoint } from "@/lib/stories/checkpointClient";
 
 // Covers
-import sunMoonCover from "@/assets/books/sun-moon-cover.jpeg";
-import necklaceCombCover from "@/assets/books/necklace-comb-cover.webp";
-import coconutManCover from "@/assets/books/coconut-man-cover.jpeg";
+import sunMoonCover from "client/public/book image/sun and moon.png";
+import necklaceCombCover from "client/public/book image/necklace and the comb.png";
+import BernardoCarpioCover from "client/public/book image/bernardo carpio.png";
 
 type StoryItem = {
   /** slug used by your route and checkpoint API */
@@ -141,7 +141,7 @@ export default function TwoDAnimation() {
       color: "from-amber-500 to-yellow-400",
       shadowColor: "shadow-amber-300/30",
       icon: "☀️",
-      pages: 8,
+      pages: 15,
     },
     {
       id: "necklace-comb",
@@ -157,11 +157,11 @@ export default function TwoDAnimation() {
       id: "bernardo-carpio",
       title: "Bernardo Carpio",
       description: "Legend of the mighty hero trapped between mountains—strength, courage, resilience.",
-      coverImage: necklaceCombCover, // TODO: replace with proper Bernardo cover asset when available
+      coverImage: BernardoCarpioCover, // TODO: replace with proper Bernardo cover asset when available
       color: "from-green-600 to-emerald-500",
       shadowColor: "shadow-green-300/40",
       icon: "🗻",
-      pages: 13,
+      pages: 15,
     },
   ];
 
