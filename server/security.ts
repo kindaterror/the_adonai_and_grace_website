@@ -192,6 +192,9 @@ export function getCSPHeader(opts: BuildCSPOptions = {}): string {
       directives["script-src"].push(`'nonce-${nonce}'`);
       directives["style-src"].push(`'nonce-${nonce}'`);
     }
+    // Allow unsafe-inline for styles in production to support Radix UI components
+    directives["style-src"].push("'unsafe-inline'");
+    
     if (enableReportEndpoint) {
       // Report to our local endpoint; browsers will send JSON POSTs here when a
       // policy violation occurs. This should be protected in prod (rate-limited
