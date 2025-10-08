@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { BookOpen, Home, ArrowRight, Sparkles } from "lucide-react";
 import { getCheckpoint } from "@/lib/stories/checkpointClient";
 
-// Covers
-import sunMoonCover from "client/public/book image/sun and moon.png";
-import necklaceCombCover from "client/public/book image/necklace and the comb.png";
-import BernardoCarpioCover from "client/public/book image/bernardo carpio.png";
+// Covers (use public/ assets via absolute paths)
+const sunMoonCover = "/book image/sun and moon.png";
+const necklaceCombCover = "/book image/necklace and the comb.png";
+const BernardoCarpioCover = "/book image/bernardo carpio.png";
 
 type StoryItem = {
   /** slug used by your route and checkpoint API */
@@ -137,7 +137,7 @@ export default function TwoDAnimation() {
       id: "sun-moon",
       title: "The Sun and Moon",
       description: "Discover the ancient tale of how the Sun and Moon came to be.",
-      coverImage: sunMoonCover,
+  coverImage: sunMoonCover,
       color: "from-amber-500 to-yellow-400",
       shadowColor: "shadow-amber-300/30",
       icon: "☀️",
@@ -147,7 +147,7 @@ export default function TwoDAnimation() {
       id: "necklace-comb",
       title: "The Necklace and the Comb",
       description: "Follow the journey of magical artifacts through generations.",
-      coverImage: necklaceCombCover,
+  coverImage: necklaceCombCover,
       color: "from-blue-500 to-purple-400",
       shadowColor: "shadow-blue-300/30",
       icon: "✨",
@@ -157,7 +157,7 @@ export default function TwoDAnimation() {
       id: "bernardo-carpio",
       title: "Bernardo Carpio",
       description: "Legend of the mighty hero trapped between mountains—strength, courage, resilience.",
-      coverImage: BernardoCarpioCover, // TODO: replace with proper Bernardo cover asset when available
+  coverImage: BernardoCarpioCover, // TODO: replace with proper Bernardo cover asset when available
       color: "from-green-600 to-emerald-500",
       shadowColor: "shadow-green-300/40",
       icon: "🗻",
