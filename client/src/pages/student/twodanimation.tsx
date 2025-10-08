@@ -76,7 +76,8 @@ function StoryCard({
             <img
               src={story.coverImage}
               alt={story.title}
-              className="w-full h-full object-cover mix-blend-overlay transition-transform hover:scale-110 duration-700"
+              className="w-full h-full object-contain mix-blend-overlay transition-transform hover:scale-105 duration-700 bg-center bg-no-repeat"
+              style={{ backgroundColor: 'transparent' }}
             />
             <div className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full text-xl">
               {story.icon}
@@ -155,9 +156,9 @@ export default function TwoDAnimation() {
     },
     {
       id: "bernardo-carpio",
-      title: "Bernardo Carpio",
+      title: "Alamat ni Bernardo Carpio",
       description: "Legend of the mighty hero trapped between mountains—strength, courage, resilience.",
-  coverImage: BernardoCarpioCover, // TODO: replace with proper Bernardo cover asset when available
+  coverImage: BernardoCarpioCover, 
       color: "from-green-600 to-emerald-500",
       shadowColor: "shadow-green-300/40",
       icon: "🗻",
