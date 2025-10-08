@@ -135,6 +135,9 @@ export function PageForm({
   const [lastQuestionsChange, setLastQuestionsChange] = useState(0);
   const [lastImageChange, setLastImageChange] = useState(0);
 
+  // Debounced save timeout reference
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Initialize form
   const form = useForm<PageFormValues>({
     resolver: zodResolver(pageSchema),
@@ -147,7 +150,38 @@ export function PageForm({
     },
   });
 
+  // Debounced save function
+  const debouncedSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    saveTimeoutRef.current = setTimeout(() => {
+      const formValues = form.getValues();
+      if (formValues.content && formValues.content.trim()) {
+        const payload = {
+          id: initialValues?.id,
+          pageNumber,
+          title: formValues.title ?? '',
+          content: formValues.content ?? '',
+          imageUrl: formValues.imageUrl ?? '',
+          imagePublicId: formValues.imagePublicId ?? '',
+          questions: questions.length > 0 ? questions : undefined,
+          showNotification: false // Don't show notification for auto-saves
+        };
+        onSave(payload);
+      }
+    }, 1000); // Save after 1 second of no changes
+  }, [form, initialValues?.id, pageNumber, questions, onSave]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Sync questions only on first mount or when initialValues.id changes (avoid resets)
   const prevInitIdRef = useRef<number | undefined>(initialValues?.id);
@@ -244,6 +278,7 @@ export function PageForm({
       { questionText: '', answerType: 'text', correctAnswer: '', options: '' }
     ]);
     setLastQuestionsChange(Date.now());
+    debouncedSave();
   };
 
   const removeQuestion = (index: number) => {
@@ -253,6 +288,7 @@ export function PageForm({
       return updated;
     });
     setLastQuestionsChange(Date.now());
+    debouncedSave();
   };
 
   const updateQuestion = (index: number, field: keyof Question, value: string) => {
@@ -266,6 +302,7 @@ export function PageForm({
       return updated;
     });
     setLastQuestionsChange(Date.now());
+    debouncedSave();
   };
 
   // == Option Management ==
@@ -346,6 +383,7 @@ export function PageForm({
                             value={field.value ?? ''}
                             onChange={(e) => {
                               field.onChange(e.target.value);
+                              debouncedSave();
                             }}
                             className="border-2 border-brand-gold-200 focus:border-ilaw-gold"
                           />
@@ -369,6 +407,7 @@ export function PageForm({
                             {...field}
                             onChange={(e) => {
                               field.onChange(e.target.value);
+                              debouncedSave();
                             }}
                             className="border-2 border-brand-gold-200 focus:border-ilaw-gold flex-1 h-full min-h=[260px] md:min-h-0 resize-vertical md:resize-none"
                           />
@@ -480,6 +519,7 @@ export function PageForm({
                                 if (v) form.setValue('imagePublicId', '');
                                 setImagePreview(v || null);
                                 setLastImageChange(Date.now());
+                                debouncedSave();
                               }}
                               disabled={imageUploading}
                             />
