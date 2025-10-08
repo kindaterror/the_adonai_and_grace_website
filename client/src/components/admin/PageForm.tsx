@@ -84,6 +84,11 @@ const itemFade = {
 };
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.08 } } };
 
+// Autosave delays (ms)
+const CONTENT_SAVE_DELAY_MS = 25000; // 25 seconds
+const QUESTIONS_SAVE_DELAY_MS = 25000; // 25 seconds
+const IMAGE_SAVE_DELAY_MS = 25000; // 25 seconds
+
 // == PAGE FORM COMPONENT ==
 export function PageForm({
   initialValues,
@@ -153,7 +158,7 @@ export function PageForm({
           onSave(pageData);
           setHasUnsavedChanges(false);
           saveTimeoutRef.current = null;
-        }, 1200) as unknown as number;
+        }, CONTENT_SAVE_DELAY_MS) as unknown as number;
       }
     });
 
@@ -184,7 +189,7 @@ export function PageForm({
         onSave(pageData);
         setHasUnsavedChanges(false);
         saveTimeoutRef.current = null;
-      }, 500) as unknown as number;
+      }, QUESTIONS_SAVE_DELAY_MS) as unknown as number;
     }
   }, [questions, form, pageNumber, onSave, isInitialLoad, hasUnsavedChanges, lastQuestionsChange]);
 
@@ -225,7 +230,7 @@ export function PageForm({
         onSave(pageData);
         setHasUnsavedChanges(false);
         saveTimeoutRef.current = null;
-      }, 500) as unknown as number;
+      }, IMAGE_SAVE_DELAY_MS) as unknown as number;
     };
     reader.readAsDataURL(file);
   };
