@@ -1,13 +1,3 @@
-/**
- * PageForm (updated)
- * Key fixes:
- * 1. Removed delayed isInitialLoad timeout (could feel like a "restart") and simplified initial load logic.
- * 2. Added stable temp id ref (can be used by parent as a reliable key to avoid remounts when pageNumber changes).
- * 3. Properly tracks unsaved changes for title/content edits (previously only images/questions triggered it).
- * 4. Narrowed effects so they don't re-run unnecessarily (avoids perceived full re-init).
- * 5. Added optional onDirty flag logic (internal) – keeps behavior lightweight.
- * 6. Defensive checks around Cloudinary preview selection.
- */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { z } from 'zod';
@@ -142,8 +132,6 @@ export function PageForm({
   const [previewTriedTransformed, setPreviewTriedTransformed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [lastQuestionsChange, setLastQuestionsChange] = useState(0);
   const [lastImageChange, setLastImageChange] = useState(0);
 
@@ -159,13 +147,7 @@ export function PageForm({
     },
   });
 
-  // Snapshot of initial values for change detection
-  const initialSnapshotRef = useRef(form.getValues());
 
-  // Mark end of initial mount quickly (no delayed timer)
-  useEffect(() => {
-    setIsInitialLoad(false);
-  }, []);
 
   // Sync questions only on first mount or when initialValues.id changes (avoid resets)
   const prevInitIdRef = useRef<number | undefined>(initialValues?.id);
@@ -199,50 +181,9 @@ export function PageForm({
     }
   }, [transformed, fallbackRaw, previewSrc, previewTriedTransformed]);
 
-  // Track form field changes for unsaved state (title/content/image)
-  useEffect(() => {
-    const subscription = form.watch((current) => {
-      if (isInitialLoad) return;
-      const hasDiff =
-        JSON.stringify(current) !== JSON.stringify(initialSnapshotRef.current);
-      if (hasDiff) setHasUnsavedChanges(true);
-    });
-    return () => subscription.unsubscribe();
-  }, [form, isInitialLoad]);
 
-  // == Manual Save Builder ==
-  const buildPayload = useCallback(
-    (showNotification: boolean): PageFormValues | null => {
-      const v = form.getValues();
-      if (!v.content || !v.content.trim()) return null;
-      return {
-        id: initialValues?.id,
-        pageNumber,
-        title: v.title ?? '',
-        content: v.content ?? '',
-        imageUrl: v.imageUrl ?? '',
-        imagePublicId: v.imagePublicId ?? '',
-        questions: questions.length > 0 ? questions : undefined,
-        showNotification
-      };
-    },
-    [form, initialValues?.id, pageNumber, questions]
-  );
 
-  const handleManualSave = useCallback(() => {
-    const payload = buildPayload(true);
-    if (!payload) {
-      toast({
-        title: 'Content required',
-        description: 'Please add page content before saving.',
-        variant: 'destructive'
-      });
-      return;
-    }
-    onSave(payload);
-    initialSnapshotRef.current = form.getValues();
-    setHasUnsavedChanges(false);
-  }, [buildPayload, onSave, toast, form]);
+
 
   // == Image Handling ==
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -266,7 +207,6 @@ export function PageForm({
       setImagePreview(url);
       setPreviewSrc(url);
       setPreviewTriedTransformed(false);
-      setHasUnsavedChanges(true);
       setLastImageChange(Date.now());
       toast({ title: 'Image uploaded', description: 'Page image uploaded successfully.' });
     } catch (err: any) {
@@ -285,7 +225,6 @@ export function PageForm({
     setPreviewSrc(null);
     form.setValue("imageUrl", "");
     form.setValue("imagePublicId", "");
-    setHasUnsavedChanges(true);
     setLastImageChange(Date.now());
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -304,7 +243,6 @@ export function PageForm({
       ...prev,
       { questionText: '', answerType: 'text', correctAnswer: '', options: '' }
     ]);
-    setHasUnsavedChanges(true);
     setLastQuestionsChange(Date.now());
   };
 
@@ -314,7 +252,6 @@ export function PageForm({
       updated.splice(index, 1);
       return updated;
     });
-    setHasUnsavedChanges(true);
     setLastQuestionsChange(Date.now());
   };
 
@@ -328,7 +265,6 @@ export function PageForm({
       }
       return updated;
     });
-    setHasUnsavedChanges(true);
     setLastQuestionsChange(Date.now());
   };
 
@@ -370,27 +306,8 @@ export function PageForm({
           <h3 className="text-xl font-heading font-bold text-ilaw-navy flex items-center">
             <Sparkles className="h-5 w-5 text-ilaw-gold mr-2" />
             📄 Page {pageNumber}
-            {hasUnsavedChanges && !isInitialLoad && (
-              <motion.span
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="ml-2 text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium"
-              >
-                • Unsaved
-              </motion.span>
-            )}
           </h3>
           <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-              onClick={handleManualSave}
-              disabled={!hasUnsavedChanges || isInitialLoad}
-              className="bg-ilaw-gold hover:bg-amber-500 text-white font-heading font-bold disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {hasUnsavedChanges ? 'Save Page' : 'Saved'}
-            </Button>
             {showRemoveButton && (
               <Button
                 type="button"
@@ -429,7 +346,6 @@ export function PageForm({
                             value={field.value ?? ''}
                             onChange={(e) => {
                               field.onChange(e.target.value);
-                              if (!isInitialLoad) setHasUnsavedChanges(true);
                             }}
                             className="border-2 border-brand-gold-200 focus:border-ilaw-gold"
                           />
@@ -453,7 +369,6 @@ export function PageForm({
                             {...field}
                             onChange={(e) => {
                               field.onChange(e.target.value);
-                              if (!isInitialLoad) setHasUnsavedChanges(true);
                             }}
                             className="border-2 border-brand-gold-200 focus:border-ilaw-gold flex-1 h-full min-h=[260px] md:min-h-0 resize-vertical md:resize-none"
                           />
@@ -565,7 +480,6 @@ export function PageForm({
                                 if (v) form.setValue('imagePublicId', '');
                                 setImagePreview(v || null);
                                 setLastImageChange(Date.now());
-                                setHasUnsavedChanges(true);
                               }}
                               disabled={imageUploading}
                             />
@@ -748,7 +662,7 @@ export function PageForm({
               <div className="bg-gradient-to-r from-brand-gold-50 to-brand-navy-50/40 border-2 border-brand-gold-200 rounded-xl p-3 text-center">
                 <p className="text-sm text-ilaw-navy font-medium flex items-center justify-center">
                   <Sparkles className="h-4 w-4 mr-2 text-ilaw-gold" />
-                  ✨ Edit your content then click the "Save Page" button at the top. No background autosave is running.
+                  ✨ Your changes are automatically saved.
                 </p>
               </div>
             </motion.div>
