@@ -982,7 +982,7 @@ export default function EditBook() {
                           .sort((a, b) => a.pageNumber - b.pageNumber)
                           .map((page) => (
                             <motion.div
-                              key={page.pageNumber}
+                              key={`page-${page.id || page.pageNumber}-${bookId}`}
                               variants={itemFade}
                               initial="hidden"
                               animate="visible"

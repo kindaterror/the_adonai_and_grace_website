@@ -110,7 +110,7 @@ async function uploadPageImage(file: File) {
   return data as { success: true; url: string; publicId: string };
 }
 
-export function PageForm({
+function PageFormComponent({
   initialValues,
   pageNumber,
   onSave,
@@ -118,6 +118,9 @@ export function PageForm({
   showRemoveButton = true
 }: PageFormProps) {
   const { toast } = useToast();
+  
+  // DEBUG: Let's see what's causing re-renders
+  console.log('PageForm render - pageNumber:', pageNumber, 'initialValues:', initialValues);
 
   // Stable internal id (can be used by parent as key: p.id ?? stableTempIdRef.current)
   const stableTempIdRef = useRef(
@@ -154,12 +157,42 @@ export function PageForm({
   // Track the last saved state to avoid unnecessary saves
   const lastSavedStateRef = useRef<string>('');
 
-  // Debounced save function - TEMPORARILY DISABLED FOR DEBUGGING
+  // Debounced save function
   const debouncedSave = useCallback(() => {
-    // DISABLED: Let's see if this stops the cursor jumping
-    console.log('debouncedSave called but disabled for debugging');
-    // Early return - no saving will happen
-  }, []);
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    saveTimeoutRef.current = setTimeout(() => {
+      const formValues = form.getValues();
+      if (formValues.content && formValues.content.trim()) {
+        const payload = {
+          id: initialValues?.id,
+          pageNumber,
+          title: formValues.title ?? '',
+          content: formValues.content ?? '',
+          imageUrl: formValues.imageUrl ?? '',
+          imagePublicId: formValues.imagePublicId ?? '',
+          questions: questions.length > 0 ? questions : undefined,
+          showNotification: false // Don't show notification for auto-saves
+        };
+        
+        // Create a hash of the current state to compare with last saved state
+        const currentStateHash = JSON.stringify({
+          title: payload.title,
+          content: payload.content,
+          imageUrl: payload.imageUrl,
+          questions: payload.questions
+        });
+        
+        // Only save if something has actually changed
+        if (currentStateHash !== lastSavedStateRef.current) {
+          lastSavedStateRef.current = currentStateHash;
+          onSave(payload);
+        }
+      }
+    }, 2000); // Increased to 2 seconds for less frequent saves
+  }, [form, initialValues?.id, pageNumber, questions, onSave]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -709,3 +742,14 @@ export function PageForm({
     </motion.div>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export const PageForm = React.memo(PageFormComponent, (prevProps, nextProps) => {
+  // Custom comparison function - only re-render if these specific props change
+  return (
+    prevProps.pageNumber === nextProps.pageNumber &&
+    prevProps.showRemoveButton === nextProps.showRemoveButton &&
+    // Deep compare initialValues to avoid re-renders when reference changes but content is same
+    JSON.stringify(prevProps.initialValues) === JSON.stringify(nextProps.initialValues)
+  );
+});
