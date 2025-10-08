@@ -5,28 +5,29 @@ import Header from "@/components/layout/Header";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Home, ArrowRight, Sparkles } from "lucide-react";
+import { Home, ArrowRight, Sparkles } from "lucide-react";
 import { getCheckpoint } from "@/lib/stories/checkpointClient";
 
-// Covers (use public/ assets via absolute paths)
+/* ------------------------------ Covers ------------------------------ */
+// (Served from /public)
 const sunMoonCover = "/book image/sun and moon.png";
 const necklaceCombCover = "/book image/necklace and the comb.png";
-const BernardoCarpioCover = "/book image/bernardo carpio.png";
+const BernardoCarpioCover = "/book image/bernardo capio.jpg";
 
+/* ------------------------------ Types ------------------------------- */
 type StoryItem = {
-  /** slug used by your route and checkpoint API */
-  id: string;
-  /** (optional) numeric DB id if you still need it elsewhere */
-  bookId?: number;
+  id: string;            // slug/route id
+  bookId?: number;       // optional numeric id
   title: string;
   description: string;
   coverImage: string;
-  color: string;
-  shadowColor: string;
+  color: string;         // tailwind gradient colors (e.g., from-amber-500 to-yellow-400)
+  shadowColor: string;   // tailwind shadow color (e.g., shadow-amber-300/30)
   icon: string;
   pages: number;
 };
 
+/* ---------------------------- Story Card ---------------------------- */
 function StoryCard({
   story,
   isLoaded,
@@ -36,7 +37,6 @@ function StoryCard({
   isLoaded: boolean;
   delayMs?: number;
 }) {
-  // ✅ Query checkpoint by SLUG
   const { data, isLoading } = useQuery({
     queryKey: ["/api/stories", story.id, "checkpoint"],
     queryFn: () => getCheckpoint(story.id),
@@ -50,14 +50,11 @@ function StoryCard({
       ? Math.max(0, Math.min(100, Math.round(cp.percentComplete)))
       : null;
 
-  // --- CTA label logic
+  // CTA label
   let ctaLabel = "Read Story";
   if (typeof percent === "number") {
-    if (percent >= 100) {
-      ctaLabel = "Read again";
-    } else if (percent > 0 && pageNumber && pageNumber > 1) {
-      ctaLabel = `Continue (p. ${pageNumber})`;
-    }
+    if (percent >= 100) ctaLabel = "Read again";
+    else if (percent > 0 && pageNumber && pageNumber > 1) ctaLabel = `Continue (p. ${pageNumber})`;
   }
 
   return (
@@ -68,35 +65,48 @@ function StoryCard({
       style={{ transitionDelay: `${delayMs}ms` }}
     >
       <Card
-        className={`overflow-hidden hover:shadow-xl transition-all duration-500 bg-gray-800 border-0 h-full ${story.shadowColor} hover:-translate-y-2 font-sans font-bold`}
+        className={`overflow-hidden bg-gray-800 border-0 h-full ${story.shadowColor}
+          hover:-translate-y-2 hover:shadow-2xl transition-all duration-500
+          font-sans font-bold rounded-xl`}
       >
         <div className="relative">
-          {/* Cover */}
-          <div className={`aspect-[4/3] relative overflow-hidden bg-gradient-to-br ${story.color}`}>
+          {/* -------------------------- Cover -------------------------- */}
+          <div className="relative aspect-[4/3] overflow-hidden rounded-b-none">
+            {/* Subtle frame/glow behind the image */}
+            <div
+              className={`absolute inset-0 bg-gradient-to-br ${story.color} opacity-25 pointer-events-none`}
+              aria-hidden
+            />
+            {/* Keep FULL IMAGE visible */}
             <img
               src={story.coverImage}
               alt={story.title}
-              className="w-full h-full object-contain mix-blend-overlay transition-transform hover:scale-105 duration-700 bg-center bg-no-repeat"
-              style={{ backgroundColor: 'transparent' }}
+              className="relative z-[1] w-full h-full object-contain object-center transition-transform duration-700 ease-in-out hover:scale-[1.04] bg-transparent"
             />
-            <div className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full text-xl">
+            {/* Bottom fade for readability, much lower intensity */}
+            <div
+              className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/35 to-transparent z-[2] pointer-events-none"
+              aria-hidden
+            />
+            {/* Icon */}
+            <div className="absolute top-4 right-4 z-[3] w-10 h-10 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full text-xl shadow-md">
               {story.icon}
             </div>
-
             {/* Progress chip */}
             {typeof percent === "number" && percent > 0 && (
-              <div className="absolute bottom-4 left-4 text-xs px-2 py-1 rounded-md bg-black/40 backdrop-blur-sm text-white border border-white/20">
+              <div className="absolute bottom-4 left-4 z-[3] text-xs px-3 py-1 rounded-md bg-black/45 backdrop-blur-sm text-white border border-white/20 shadow-sm">
                 {percent >= 100 ? "100% complete" : `${percent}% complete`}
               </div>
             )}
           </div>
 
-          {/* Title/CTA */}
+          {/* ---------------------- Title / CTA ----------------------- */}
           <div className="p-5 flex flex-col h-48">
             <h2 className="text-xl font-sans font-bold mb-2 text-white">{story.title}</h2>
             <p className="text-gray-300 font-sans font-bold mb-4 flex-grow">
               {story.description}
             </p>
+
             <div className="flex justify-between items-center mt-auto">
               <span className="text-sm font-sans font-bold text-gray-400">
                 {story.pages} pages
@@ -104,7 +114,8 @@ function StoryCard({
 
               <Link href={`/student/read-twodanimation/${encodeURIComponent(story.id)}`}>
                 <Button
-                  className={`bg-gradient-to-r ${story.color} hover:brightness-110 text-white group font-sans font-bold`}
+                  className={`bg-gradient-to-r ${story.color} hover:brightness-110 text-white
+                    group font-sans font-bold shadow-md hover:shadow-lg`}
                 >
                   {isLoading ? (
                     "Loading…"
@@ -124,6 +135,7 @@ function StoryCard({
   );
 }
 
+/* ---------------------------- Page Shell ---------------------------- */
 export default function TwoDAnimation() {
   const { user } = useAuth();
   const [isLoaded, setIsLoaded] = useState(false);
@@ -132,13 +144,12 @@ export default function TwoDAnimation() {
     setIsLoaded(true);
   }, []);
 
-  // ✅ Use slugs as ids here; bookId is optional now
   const stories: StoryItem[] = [
     {
       id: "sun-moon",
       title: "The Sun and Moon",
       description: "Discover the ancient tale of how the Sun and Moon came to be.",
-  coverImage: sunMoonCover,
+      coverImage: sunMoonCover,
       color: "from-amber-500 to-yellow-400",
       shadowColor: "shadow-amber-300/30",
       icon: "☀️",
@@ -148,7 +159,7 @@ export default function TwoDAnimation() {
       id: "necklace-comb",
       title: "The Necklace and the Comb",
       description: "Follow the journey of magical artifacts through generations.",
-  coverImage: necklaceCombCover,
+      coverImage: necklaceCombCover,
       color: "from-blue-500 to-purple-400",
       shadowColor: "shadow-blue-300/30",
       icon: "✨",
@@ -157,8 +168,9 @@ export default function TwoDAnimation() {
     {
       id: "bernardo-carpio",
       title: "Alamat ni Bernardo Carpio",
-      description: "Legend of the mighty hero trapped between mountains—strength, courage, resilience.",
-  coverImage: BernardoCarpioCover, 
+      description:
+        "Legend of the mighty hero trapped between mountains—strength, courage, resilience.",
+      coverImage: BernardoCarpioCover,
       color: "from-green-600 to-emerald-500",
       shadowColor: "shadow-green-300/40",
       icon: "🗻",
