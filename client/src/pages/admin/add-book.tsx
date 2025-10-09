@@ -37,7 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { motion, AnimatePresence } from "@/lib/motionShim";
+import { motion, AnimatePresence } from "framer-motion";
 
 // == ANIMATION PRESETS (UI only) ==
 const fadeCard = {
@@ -139,11 +139,9 @@ export default function AddBook() {
   // keep BOTH url + publicId here
   const [cover, setCover] = useState<CoverState>(null);
 
-  // pages (use a stable tempId per page to avoid React remount flicker)
-  type LocalPage = PageFormValues & { tempId: string };
-  const createTempId = () => `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
-  const [pages, setPages] = useState<LocalPage[]>([
-    { pageNumber: 1, content: "", title: "", imageUrl: "", questions: [], tempId: createTempId() },
+  // pages
+  const [pages, setPages] = useState<PageFormValues[]>([
+    { pageNumber: 1, content: "", title: "", imageUrl: "", questions: [] },
   ]);
   const [activePageIndex, setActivePageIndex] = useState<number | null>(0);
 
@@ -390,7 +388,7 @@ export default function AddBook() {
   // page management
   const addNewPage = () => {
     const newPageNumber = pages.length + 1;
-    setPages([...pages, { pageNumber: newPageNumber, content: "", title: "", imageUrl: "", questions: [], tempId: createTempId() }]);
+    setPages([...pages, { pageNumber: newPageNumber, content: "", title: "", imageUrl: "", questions: [] }]);
     setActivePageIndex(newPageNumber - 1);
   };
 
@@ -400,8 +398,7 @@ export default function AddBook() {
       return;
     }
     const updated = [...pages];
-    updated.splice(index, 1);
-    // renumber pageNumber but keep tempId stable
+    updated.splice(index, 1).filter(Boolean);
     const renumbered = updated.map((p, i) => ({ ...p, pageNumber: i + 1 }));
     setPages(renumbered);
     setActivePageIndex(null);
@@ -419,10 +416,8 @@ export default function AddBook() {
         return;
       }
     }
-  const copy = [...pages];
-  // preserve tempId when saving (values from child doesn't include tempId)
-  const existingTempId = (copy[index] as any)?.tempId ?? createTempId();
-  copy[index] = { ...(values as LocalPage), tempId: existingTempId };
+    const copy = [...pages];
+    copy[index] = values;
     setPages(copy);
     setActivePageIndex(null);
     toast({ title: "Page Saved", description: `Page ${values.pageNumber} content has been saved.` });
@@ -442,7 +437,7 @@ export default function AddBook() {
           <div className="flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-ilaw-gold" />
             <span className="text-sm text-ilaw-gold">
-              ADONAI AND GRACE INC.
+              ILAW NG BAYAN LEARNING INSTITUTE
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -971,7 +966,7 @@ export default function AddBook() {
             <AnimatePresence initial={false}>
               {pages.map((page, index) => (
                 <motion.div
-                  key={(page as any).tempId}
+                  key={index}
                   variants={itemFade}
                   initial="hidden"
                   animate="visible"
