@@ -66,17 +66,30 @@ async function loadPages(lang: Lang): Promise<Page[]> {
   }
 }
 
+function withBase(path: string | undefined): string | undefined {
+  if (!path) return path;
+  return '/' + String(path).replace(/^\//, '');
+}
+
 function normalizeRawPage(raw: any): Page {
   // Accept legacy shape with question/options at root
-  if (raw.quiz) return raw as Page;
+  if (raw.quiz) {
+    return {
+      ...raw,
+      videoMp4: withBase(raw.videoMp4),
+      videoWebm: withBase(raw.videoWebm),
+      videoPoster: withBase(raw.videoPoster),
+      illustration: withBase(raw.illustration),
+    } as Page;
+  }
   if (raw.question && raw.options) {
     return {
       id: raw.id,
       title: raw.title,
       narration: raw.narration || '',
       character: raw.character,
-      illustration: raw.illustration,
-      videoMp4: raw.videoMp4, videoWebm: raw.videoWebm, videoPoster: raw.videoPoster,
+      illustration: withBase(raw.illustration),
+      videoMp4: withBase(raw.videoMp4), videoWebm: withBase(raw.videoWebm), videoPoster: withBase(raw.videoPoster),
       quiz: {
         questionSlug: raw.id + '-q',
         question: raw.question,
@@ -84,7 +97,7 @@ function normalizeRawPage(raw: any): Page {
       }
     };
   }
-  return { id: raw.id, title: raw.title, narration: raw.narration || '', character: raw.character, illustration: raw.illustration };
+  return { id: raw.id, title: raw.title, narration: raw.narration || '', character: raw.character, illustration: withBase(raw.illustration), videoMp4: withBase(raw.videoMp4), videoWebm: withBase(raw.videoWebm), videoPoster: withBase(raw.videoPoster) };
 }
 
 /* ===== minimal neutral fallback (only used if JSON fails) ===== */

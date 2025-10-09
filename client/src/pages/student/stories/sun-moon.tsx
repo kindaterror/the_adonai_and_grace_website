@@ -644,8 +644,12 @@ export default function SunMoonStory() {
       className={`min-h-screen flex flex-col sunmoon-theme ${isFullscreen ? "book-fullscreen-mode" : ""} ${isBooting ? "nc-booting" : ""}`}
     >
 
-      {/* background */}
-      <div className="nc-bg" style={{ backgroundImage: `url(${bg})` }} aria-hidden="true" />
+      {/* background video */}
+      <div className="nc-bg" aria-hidden="true">
+        <Suspense fallback={null}>
+          <LoopingVideoLazy srcMp4={bg} muted autoPlay loop playsInline className="nc-bg-video" poster={'/assets/bookanimation/sun and moon.png'} />
+        </Suspense>
+      </div>
       <div className="sm-stars" />
 
       {/* loader */}
