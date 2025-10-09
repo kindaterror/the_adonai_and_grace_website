@@ -13,6 +13,13 @@ const sunMoonCover = "/book-image/sun-and-moon.png";
 const necklaceCombCover = "/book-image/necklace-and-the-comb.png";
 const BernardoCarpioCover = "/book-image/bernardo-carpio.jpg";
 
+// card background fills (used when the image is shown with object-contain to avoid gaps)
+const cardBgMap: Record<string, string> = {
+  "sun-moon": "#07102a", // deep indigo / night
+  "necklace-comb": "#071233", // deep navy
+  "bernardo-carpio": "#071810", // deep forest
+};
+
 /* ------------------------------ Types ------------------------------- */
 type StoryItem = {
   id: string;
@@ -69,30 +76,37 @@ function StoryCard({
       >
         <div className="relative">
           {/* -------------------------- Cover -------------------------- */}
-          <div className="relative aspect-[4/3] overflow-hidden rounded-b-none">
-            {/* Background blur (fills gaps, never stretched) */}
-            <img
-              src={story.coverImage}
-              alt=""
-              aria-hidden
-              className="absolute inset-0 w-full h-full object-cover blur-xl scale-110"
-            />
-            {/* Main cover (keeps full image ratio, fills container) */}
-            <img
-              src={story.coverImage}
-              alt={story.title}
-              className="relative z-[1] w-full h-full object-cover object-center transition-transform duration-700 ease-in-out hover:scale-[1.05]"
-              onError={(e) => {
-                const img = e.currentTarget as HTMLImageElement;
-                if ((img.dataset as any).fallbackTried) return;
-                (img.dataset as any).fallbackTried = "1";
-                if (img.src.includes("%20")) {
-                  img.src = img.src.replace(/%20/g, " ");
-                } else {
-                  img.src = img.src.replace(/ /g, "%20");
-                }
-              }}
-            />
+            <div className="relative aspect-[4/3] overflow-hidden rounded-b-none">
+              {/* Background blur (fills gaps, never stretched) */}
+              <img
+                src={story.coverImage}
+                alt=""
+                aria-hidden
+                className="absolute inset-0 w-full h-full object-cover blur-xl scale-110"
+              />
+
+              {/* Main cover: show whole image (no cropping) while keeping a filled background so there are no gaps */}
+              <div
+                className="relative z-[1] w-full h-full flex items-center justify-center transition-transform duration-700 ease-in-out"
+                style={{ backgroundColor: cardBgMap[story.id] || "#0b0f25" }}
+              >
+                <img
+                  src={story.coverImage}
+                  alt={story.title}
+                  className="max-w-full max-h-full object-contain object-center"
+                  style={{ width: "auto", height: "100%" }}
+                  onError={(e) => {
+                    const img = e.currentTarget as HTMLImageElement;
+                    if ((img.dataset as any).fallbackTried) return;
+                    (img.dataset as any).fallbackTried = "1";
+                    if (img.src.includes("%20")) {
+                      img.src = img.src.replace(/%20/g, " ");
+                    } else {
+                      img.src = img.src.replace(/ /g, "%20");
+                    }
+                  }}
+                />
+              </div>
 
             {/* Bottom fade */}
             <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/35 to-transparent z-[2] pointer-events-none" />
@@ -166,16 +180,6 @@ export default function TwoDAnimation() {
       pages: 15,
     },
     {
-      id: "necklace-comb",
-      title: "The Necklace and the Comb",
-      description: "Follow the journey of magical artifacts through generations.",
-      coverImage: necklaceCombCover,
-      color: "from-blue-500 to-purple-400",
-      shadowColor: "shadow-blue-300/30",
-      icon: "✨",
-      pages: 21,
-    },
-    {
       id: "bernardo-carpio",
       title: "Alamat ni Bernardo Carpio",
       description:
@@ -185,6 +189,16 @@ export default function TwoDAnimation() {
       shadowColor: "shadow-green-300/40",
       icon: "🗻",
       pages: 15,
+    },
+    {
+      id: "necklace-comb",
+      title: "The Necklace and the Comb",
+      description: "Follow the journey of magical artifacts through generations.",
+      coverImage: necklaceCombCover,
+      color: "from-blue-500 to-purple-400",
+      shadowColor: "shadow-blue-300/30",
+      icon: "✨",
+      pages: 21,
     },
   ];
 
