@@ -63,7 +63,7 @@ export function Logo({
       {/* Logo image with fallback */}
       <div className="relative flex items-center justify-center">
         <img
-          src="/logo1.png"
+          src="assets/logo1.png"
           alt={`${SCHOOL_NAME_FULL} Logo`}
           className={`${getSizeClasses()} w-auto transition-transform duration-300 group-hover:scale-110`}
           style={{ maxHeight: size === "xl" ? "64px" : size === "lg" ? "56px" : size === "sm" ? "32px" : "40px" }}

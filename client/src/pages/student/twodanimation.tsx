@@ -87,13 +87,13 @@ function StoryCard({
 
               {/* Main cover: show whole image (no cropping) while keeping a filled background so there are no gaps */}
               <div
-                className="relative z-[1] w-full h-full flex items-center justify-center transition-transform duration-700 ease-in-out"
+                className="relative z-[1] w-full h-full flex items-start justify-center transition-transform duration-700 ease-in-out"
                 style={{ backgroundColor: cardBgMap[story.id] || "#0b0f25" }}
               >
                 <img
                   src={story.coverImage}
                   alt={story.title}
-                  className="max-w-full max-h-full object-contain object-center"
+                  className="max-w-full max-h-full object-contain object-top"
                   style={{ width: "auto", height: "100%" }}
                   onError={(e) => {
                     const img = e.currentTarget as HTMLImageElement;
