@@ -209,6 +209,10 @@ export default function SunMoonStory() {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const typedCacheRef = useRef<Set<string>>(new Set());
   const [flipRightNow, setFlipRightNow] = useState(false);
+  // Background music
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioReady, setAudioReady] = useState(false);
+  const [userInteracted, setUserInteracted] = useState(false);
 
   // fullscreen tracking
   useEffect(() => {
@@ -225,6 +229,34 @@ export default function SunMoonStory() {
     document.body.classList.toggle("book-fullscreen-mode", isFullscreen);
     return () => document.body.classList.remove("book-fullscreen-mode");
   }, [isFullscreen]);
+
+  // Wire background music playback with autoplay policies
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.volume = 0.25;
+    el.muted = isMuted;
+    if (isMuted) {
+      // pause when muted
+      try { el.pause(); } catch {}
+      return;
+    }
+    // Try to play if user has interacted; otherwise will be started on first interaction
+    if (userInteracted) {
+      el.play().catch(() => {});
+    }
+  }, [isMuted, userInteracted]);
+
+  // Mark user interaction to allow audio playback
+  useEffect(() => {
+    const onFirstInteract = () => setUserInteracted(true);
+    window.addEventListener("pointerdown", onFirstInteract, { once: true });
+    window.addEventListener("keydown", onFirstInteract, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", onFirstInteract as any);
+      window.removeEventListener("keydown", onFirstInteract as any);
+    };
+  }, []);
 
   // preload background + first illustration/poster (from first page once loaded) for nicer entrance
   useEffect(() => {
@@ -574,6 +606,13 @@ export default function SunMoonStory() {
         });
       }
 
+      // capture audio position if available
+      const audioPos = (() => {
+        const el = audioRef.current;
+        if (!el) return 0;
+        try { return Math.floor(el.currentTime || 0); } catch { return 0; }
+      })();
+
       await saveCheckpointAPI(BOOK_SLUG, {
         pageNumber: currentPageNumber,
         answersJson: answers,
@@ -584,7 +623,7 @@ export default function SunMoonStory() {
           hasAnswered,
           rightUnlocked,
         },
-        audioPositionSec: 0,
+        audioPositionSec: audioPos,
         percentComplete: percent,
       });
     } catch (e) {
@@ -609,6 +648,18 @@ export default function SunMoonStory() {
 
         if (cp.answersJson && typeof cp.answersJson === "object") {
           setAnswers(cp.answersJson as Record<string, string>);
+        }
+
+        // restore audio position after metadata loads
+        const pos = Number((cp as any).audioPositionSec || 0);
+        if (pos > 0) {
+          const el = audioRef.current;
+          if (el) {
+            const setPos = () => {
+              try { el.currentTime = Math.max(0, pos - 0.5); } catch {}
+            };
+            if (el.readyState >= 1) setPos(); else el.addEventListener("loadedmetadata", setPos, { once: true });
+          }
         }
       } catch {}
     })();
@@ -650,6 +701,16 @@ export default function SunMoonStory() {
           <LoopingVideoLazy srcMp4={bg} muted autoPlay loop playsInline className="nc-bg-video" poster={'/assets/bookanimation/sun and moon.png'} />
         </Suspense>
       </div>
+      {/* background music (public asset) */}
+      <audio
+        ref={audioRef}
+        src={withBase("/audio/sun_and_moon.mp3")}
+        loop
+        playsInline
+        preload="auto"
+        onCanPlay={() => setAudioReady(true)}
+        style={{ display: 'none' }}
+      />
       <div className="sm-stars" />
 
       {/* loader */}
